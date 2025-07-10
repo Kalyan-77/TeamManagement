@@ -21,23 +21,20 @@ public class Tasks {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull(message = "Title should not be null")
     @NotBlank(message = "Title should be entered")
     @Size(min = 5, max = 200, message = "Title must contain at least 5 characters and less than 200 characters")
     private String title;
 
-    @NotNull(message = "Description should not be null")
     @NotBlank(message = "Enter Description")
     @Column(columnDefinition = "TEXT")
     private String description;
 
-
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false,length = 20)
+    @Column(nullable = false, length = 20)
     private ETaskStatus status = ETaskStatus.TO_DO;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false,length = 20)
+    @Column(nullable = false, length = 20)
     private ETaskPriority priority = ETaskPriority.MEDIUM;
 
     @FutureOrPresent(message = "Due date must be today or a future date")
@@ -54,8 +51,4 @@ public class Tasks {
     @Column(updatable = false)
     @CreationTimestamp
     private LocalDateTime createdAt;
-
-
 }
-
-

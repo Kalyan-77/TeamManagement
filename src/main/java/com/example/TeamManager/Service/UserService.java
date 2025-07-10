@@ -5,16 +5,15 @@ import com.example.TeamManager.Model.Users;
 import com.example.TeamManager.Repository.ProjectRepository;
 import com.example.TeamManager.Repository.RolesRepository;
 import com.example.TeamManager.Repository.UserRepository;
-import org.apache.catalina.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
+@Service
 public class UserService {
+
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
     private final RolesRepository rolesRepository;
@@ -31,76 +30,120 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    //create a new user object
-    public Users createUser(Users users){
-        return userRepository.save(users);
-    }
-
-    //initialize a new user object
-    //set the username of the new user to the provided username
-    //set the email of the new user to the provided password
-    //hash the provided password  using passwordEncoder.encode() and set it as the users password
-    public Users registerUser(String username, String email, String password, String role) {
-        Users newUser = new Users();
-        newUser.setName(username);
-        newUser.setEmail(email);
-        newUser.setPassword(passwordEncoder.encode(password));
-
-        Set<Roles> roles = new HashSet<>();
-
-        if ("manager".equalsIgnoreCase(role)) {
-            Roles managerRole = rolesRepository.findByName("ROLE_PROJECT_MANAGER")
-                    .orElseThrow(() -> new RuntimeException("Error: Role 'PROJECT MANAGER' not found."));
-            roles.add(managerRole);
-        } else if ("member".equalsIgnoreCase(role)) {
-            Roles memberRole = rolesRepository.findByName("ROLE_TEAM_MEMBER")
-                    .orElseThrow(() -> new RuntimeException("Error: Role 'TEAM MEMBER' not found."));
-            roles.add(memberRole);
-        } else {
-            throw new RuntimeException("Error: Invalid role specified. Must be either 'manager' or 'member'.");
+    /**
+     * Register a new user with validation, password encoding, and role assignment
+     */
+    public Users registerUser(String username, String email, String password, Set<String> strRoles) {
+        // Check Username Availability
+        if (userRepository.existsByName(username)) {
+            throw new IllegalArgumentException("Error: Username is already taken!");
         }
 
-        newUser.setRoles(roles);
-        return userRepository.save(newUser);
+        // Check Email Availability
+        if (userRepository.existsByEmail(email)) {
+            throw new IllegalArgumentException("Error: Email is already in use!");
+        }
+
+        // Create New User Object
+        Users user = new Users();
+        user.setName(username);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password));
+
+        // Assign Roles
+        Set<Roles> roles = new HashSet<>();
+
+        if (strRoles == null || strRoles.isEmpty()) {
+            // Default to TEAM_MEMBER
+            Roles memberRole = rolesRepository.findByName("ROLE_TEAM_MEMBER")
+                    .orElseThrow(() -> new RuntimeException("Error: Role 'TEAM_MEMBER' not found."));
+            roles.add(memberRole);
+        } else {
+            for (String role : strRoles) {
+                switch (role.toLowerCase()) {
+                    case "manager":
+                        Roles managerRole = rolesRepository.findByName("ROLE_PROJECT_MANAGER")
+                                .orElseThrow(() -> new RuntimeException("Error: Role 'PROJECT_MANAGER' not found."));
+                        roles.add(managerRole);
+                        break;
+                    case "member":
+                        Roles memberRole = rolesRepository.findByName("ROLE_TEAM_MEMBER")
+                                .orElseThrow(() -> new RuntimeException("Error: Role 'TEAM_MEMBER' not found."));
+                        roles.add(memberRole);
+                        break;
+                    default:
+                        throw new RuntimeException("Error: Role '" + role + "' is not supported.");
+                }
+            }
+        }
+
+        // Set Roles and Save User
+        user.setRoles(roles);
+        return userRepository.save(user);
     }
 
-    public Optional<Users> findUserById(Long id){
+    /**
+     * Find user by ID
+     */
+    public Optional<Users> findUserById(Long id) {
         return userRepository.findById(id);
     }
 
-    public Optional<Users> findByUserName(String username){
+    /**
+     * Find user by username
+     */
+    public Optional<Users> findByUserName(String username) {
         return userRepository.findByName(username);
     }
 
-    public List<Users> findAllUsers(){
+    /**
+     * Retrieve all users
+     */
+    public List<Users> findAllUsers() {
         return userRepository.findAll();
     }
 
-    void deleteUser(Long id){
-        try{
-            userRepository.deleteById(id);
-        }catch (IllegalArgumentException e){
-            System.err.println("User not found with ID: " + id);
+    /**
+     * Delete a user by ID
+     */
+    public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("User not found with ID: " + id);
         }
+        userRepository.deleteById(id);
     }
 
-    public Users updateUserRoles(Long id){
-        try{
-            Users user = userRepository.findById(id)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found with id " + id));
-            Roles role = rolesRepository.findByName("MANAGER")
-                    .orElseThrow(() -> new RuntimeException("The role 'PROJECT_MANAGER' is not found in roleRepository"));
+    /**
+     * Update a user's roles
+     */
+    public Users updateUserRoles(Long userId, Set<String> newRoles) {
+        // Find user
+        Users user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
 
-            Set<Roles> roles = new HashSet<>();
+        // Prepare new roles
+        Set<Roles> roles = new HashSet<>();
+
+        for (String roleName : newRoles) {
+            String roleKey;
+            switch (roleName.toLowerCase()) {
+                case "manager":
+                    roleKey = "ROLE_PROJECT_MANAGER";
+                    break;
+                case "member":
+                    roleKey = "ROLE_TEAM_MEMBER";
+                    break;
+                default:
+                    throw new IllegalArgumentException("Role '" + roleName + "' is not supported.");
+            }
+
+            Roles role = rolesRepository.findByName(roleKey)
+                    .orElseThrow(() -> new RuntimeException("Error: Role '" + roleName + "' not found."));
             roles.add(role);
-            user.setRoles(roles);
-
-            return userRepository.save(user);
-        }catch (IllegalArgumentException e){
-            System.err.println("User not found with id " + id);
-        }catch (RuntimeException e){
-            System.err.println("The role is not found in roleRepository with id : " + id);
         }
-    }
 
+        // Update and save
+        user.setRoles(roles);
+        return userRepository.save(user);
+    }
 }

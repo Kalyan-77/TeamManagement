@@ -7,10 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
-import javax.management.relation.Role;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -20,28 +18,25 @@ import java.util.Set;
 @Table(name = "users")
 @Data
 @NoArgsConstructor
-//@RequiredArgsConstructor
 public class Users {
-    @Id//makes it primary key
+
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull
-    @NotBlank(message = "Name is Required")
-    @Size(min = 2,max = 100, message = "Name must be between 2 to 100 characters")
+    @NotBlank(message = "Name is required")
+    @Size(min = 2, max = 100, message = "Name must be between 2 to 100 characters")
     private String name;
 
-    @NotNull
-    @NotBlank(message = "Email is Required")
+    @NotBlank(message = "Email is required")
     @Email(message = "Email should be valid")
     @Column(unique = true)
     private String email;
 
-    @NotNull
     @NotBlank(message = "Password is required")
     private String password;
 
-    @Column(name = "created_at",updatable = false)
+    @Column(name = "created_at", updatable = false)
     @CreationTimestamp
     private LocalDateTime updatedTime;
 
@@ -58,5 +53,4 @@ public class Users {
 
     @OneToMany(mappedBy = "projectManager")
     private List<Projects> managedProjects;
-
 }
