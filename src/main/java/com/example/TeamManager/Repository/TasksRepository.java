@@ -8,17 +8,17 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
-public interface TasksRepository extends JpaRepository<Tasks,Long>  {
+public interface TasksRepository extends JpaRepository<Tasks, Long> {
+
     // 1. Find tasks by assigned user, with pagination
-    Page<Tasks> findByAssignedId(Long userId, Pageable pageable);
+    Page<Tasks> findByAssignedToId(Long userId, Pageable pageable);
 
     // 2. Find tasks by project, with pagination
     Page<Tasks> findByProjectId(Long projectId, Pageable pageable);
 
     // 3. Find tasks by assigned user and status, with pagination
-    Page<Tasks> findByAssignedIdAndStatus(Long userId, ETaskStatus status, Pageable pageable);
+    Page<Tasks> findByAssignedToIdAndStatus(Long userId, ETaskStatus status, Pageable pageable);
 
     // 4. Find tasks by project and status, with pagination
     Page<Tasks> findByProjectIdAndStatus(Long projectId, ETaskStatus status, Pageable pageable);
@@ -29,8 +29,8 @@ public interface TasksRepository extends JpaRepository<Tasks,Long>  {
     // 6. Get all tasks with pagination
     Page<Tasks> findAll(Pageable pageable);
 
-    // 7. Find tasks by status
-    List<Tasks> findByStatus(ETaskStatus status);
+    // 7. Find tasks by status (paginated)
+    Page<Tasks> findByStatus(ETaskStatus status, Pageable pageable);
 
     // 8. Count tasks by status
     long countByStatus(ETaskStatus status);

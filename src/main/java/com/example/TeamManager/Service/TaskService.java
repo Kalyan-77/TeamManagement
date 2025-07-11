@@ -1,7 +1,10 @@
+// --- TaskService.java ---
 package com.example.TeamManager.Service;
 
+import com.example.TeamManager.DTO.TaskDTO;
 import com.example.TeamManager.Model.ETaskPriority;
 import com.example.TeamManager.Model.ETaskStatus;
+import com.example.TeamManager.Model.Projects;
 import com.example.TeamManager.Model.Tasks;
 import com.example.TeamManager.Model.Users;
 import com.example.TeamManager.Repository.ProjectRepository;
@@ -9,7 +12,6 @@ import com.example.TeamManager.Repository.TasksRepository;
 import com.example.TeamManager.Repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.scheduling.config.Task;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,138 +23,116 @@ public class TaskService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
 
-    public TaskService(TasksRepository tasksRepository, ProjectRepository projectRepository, UserRepository userRepository){
+    public TaskService(TasksRepository tasksRepository, ProjectRepository projectRepository, UserRepository userRepository) {
         this.tasksRepository = tasksRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
     }
-    public Tasks createTask(Tasks task) {
-        // Validate title
-        if (task.getTitle() == null || task.getTitle().trim().isEmpty()) {
-            throw new IllegalArgumentException("Task title cannot be empty");
+
+    public Tasks createTaskFromRequest(TaskDTO request) {
+        if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
+            throw new IllegalArgumentException("Title cannot be empty");
         }
 
-        // Validate due date
-        if (task.getDueDate() != null && task.getDueDate().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Due date must be today or a future date");
+        Tasks task = new Tasks();
+        task.setTitle(request.getTitle());
+        task.setDescription(request.getDescription());
+        task.setStatus(request.getStatus() != null ? request.getStatus() : ETaskStatus.TO_DO);
+        task.setPriority(request.getPriority() != null ? request.getPriority() : ETaskPriority.MEDIUM);
+        task.setDueDate(request.getDueDate());
+
+        if (request.getProjectId() == null || !projectRepository.existsById(request.getProjectId())) {
+            throw new IllegalArgumentException("Project not found with ID: " + request.getProjectId());
+        }
+        task.setProject(projectRepository.findById(request.getProjectId()).get());
+
+        if (request.getAssignedToId() != null) {
+            Users assignedUser = userRepository.findById(request.getAssignedToId())
+                    .orElseThrow(() -> new IllegalArgumentException("Assigned user not found with ID: " + request.getAssignedToId()));
+            task.setAssignedTo(assignedUser);
         }
 
-        //validate project
-        if(task.getProject() != null && task.getProject().getId() == null || !projectRepository.existsById(task.getProject().getId())){
-            throw new IllegalArgumentException("Project not found with Id");
-        }
-
-        // Handle assignedTo user
-        if (task.getAssignedTo() != null && task.getAssignedTo().getId() != null) {
-            Long assignedToId = task.getAssignedTo().getId();
-            task.setAssignedTo(userRepository.findById(assignedToId)
-                    .orElseThrow(() -> new IllegalArgumentException("Assigned user not found with id: " + assignedToId)));
-        } else {
-            task.setAssignedTo(null); // unassigned task
-        }
-
-        // Set default status if null
-        if (task.getStatus() == null) {
-            task.setStatus(ETaskStatus.TO_DO);
-        }
-
-        // Set default priority if null
-        if (task.getPriority() == null) {
-            task.setPriority(ETaskPriority.MEDIUM);
-        }
-
-        //Save and return task
         return tasksRepository.save(task);
-
     }
 
-    //Get a task ny Id
-    public Optional<Tasks> getTaskById(Long id){
+    public Optional<Tasks> getTaskById(Long id) {
         return tasksRepository.findById(id);
     }
 
-    //Get All tasks with pagination
-    public Page<Tasks> getAllTasks(Pageable pageable){
+    public Page<Tasks> getAllTasks(Pageable pageable) {
         return tasksRepository.findAll(pageable);
     }
 
-    //get tasks assigned to a specific user with pagination
-    public Page<Tasks> getTaskAssigned(Long id, Pageable pageable){
-        return tasksRepository.findByAssignedId(id,pageable);
+    public Page<Tasks> getTasksByAssignedUser(Long id, Pageable pageable) {
+        return tasksRepository.findByAssignedToId(id, pageable);
     }
 
-    //method to find tasks by projects and status with pagination(already present, just confirming)
-    public Page<Tasks> getTasksByProjectAndStatus(Long projectId, ETaskStatus status, Pageable pageable){
-        return tasksRepository.findByProjectIdAndStatus(projectId,status,pageable);
+    public Page<Tasks> getTasksByAssignedUserAndStatus(Long userId, ETaskStatus status, Pageable pageable) {
+        return tasksRepository.findByAssignedToIdAndStatus(userId, status, pageable);
     }
 
-    //Method to find tasks by status with pagination(newly added)
-    public Page<Tasks> getTasksByStatus(ETaskStatus status, Pageable pageable){
-        return tasksRepository.findByStatus(status,pageable);
+    public Page<Tasks> getTasksByProjectAndStatus(Long projectId, ETaskStatus status, Pageable pageable) {
+        return tasksRepository.findByProjectIdAndStatus(projectId, status, pageable);
     }
 
-    //Get Tasks for a specific projects with pagination
-    public Page<Tasks> getTasksByProject(Long projectId, Pageable pageable){
-        return tasksRepository.findByProjectId(projectId,pageable);
+    public Page<Tasks> getTasksByStatus(ETaskStatus status, Pageable pageable) {
+        return tasksRepository.findByStatus(status, pageable);
     }
-    //Method to find tasks by asingned user and status with pagination
-    public Page<Tasks> findByAssignedUserAndStatus(Long userId,ETaskStatus status, Pageable pageable){
-        return tasksRepository.findByAssignedIdAndStatus(userId, status, pageable);
+
+    public Page<Tasks> getTasksByProject(Long projectId, Pageable pageable) {
+        return tasksRepository.findByProjectId(projectId, pageable);
     }
-    //Delete a task
-    public void DeleteTask(Long id){
-        if(!tasksRepository.existsById(id)){
-            throw new IllegalArgumentException("Task not found by is: " + id);
+
+    public void deleteTask(Long id) {
+        if (!tasksRepository.existsById(id)) {
+            throw new IllegalArgumentException("Task not found with id: " + id);
         }
         tasksRepository.deleteById(id);
     }
 
-    //Update an existing task
     public Tasks updateTask(Long id, Tasks updatedTask) {
         Tasks existingTask = tasksRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
 
-        // Title
         if (updatedTask.getTitle() != null && !updatedTask.getTitle().trim().isEmpty()) {
             existingTask.setTitle(updatedTask.getTitle());
         }
 
-        // Description
         if (updatedTask.getDescription() != null && !updatedTask.getDescription().trim().isEmpty()) {
             existingTask.setDescription(updatedTask.getDescription());
         }
 
-        // Status
         if (updatedTask.getStatus() != null) {
             existingTask.setStatus(updatedTask.getStatus());
         }
 
-        // Priority
         if (updatedTask.getPriority() != null) {
             existingTask.setPriority(updatedTask.getPriority());
         }
 
-        //DueDate
-        if(updatedTask.getDueDate() != null){
+        if (updatedTask.getDueDate() != null) {
             existingTask.setDueDate(updatedTask.getDueDate());
         }
 
-        //Handle Task Assignment
-        if(updatedTask.getAssignedTo() != null){
-            if(updatedTask.getAssignedTo().getId() != null){
+        if (existingTask.getDueDate() != null && existingTask.getDueDate().isBefore(LocalDateTime.now()) && existingTask.getStatus() != ETaskStatus.DONE) {
+            System.out.println("Warning: Task is overdue and not completed.");
+        }
+
+        if (updatedTask.getAssignedTo() != null) {
+            if (updatedTask.getAssignedTo().getId() != null) {
                 Long newAssignedId = updatedTask.getAssignedTo().getId();
                 Users newAssignee = userRepository.findById(newAssignedId)
-                        .orElseThrow(() -> new IllegalArgumentException("New Assigned user not found id: " + newAssignedId));
+                        .orElseThrow(() -> new IllegalArgumentException("New Assigned user not found with id: " + newAssignedId));
                 existingTask.setAssignedTo(newAssignee);
-            }else{
+            } else {
                 existingTask.setAssignedTo(null);
             }
         }
+
         return tasksRepository.save(existingTask);
     }
 
-    //Update only the status of a Task
-    public Tasks UpdateTaskByStatus(Long taskId, ETaskStatus status){
+    public Tasks updateTaskStatus(Long taskId, ETaskStatus status) {
         Tasks tasks = tasksRepository.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + taskId));
         tasks.setStatus(status);
